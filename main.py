@@ -1,4 +1,5 @@
 # main.py
+import os
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Enum, Table, MetaData
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import date
