@@ -34,7 +34,8 @@ class Valorisation(Base):
     ticker = Column(String, nullable=False)
     prix_unitaire = Column(Float, nullable=False)
 
-Base.metadata.create_all(engine)
+if __name__ == "__main__":
+    Base.metadata.create_all(engine)
+    print("Base de données créée avec succès !")
 
-print("Base de données créée avec succès !")
   
