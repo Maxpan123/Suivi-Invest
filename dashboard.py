@@ -1,53 +1,64 @@
+# dashboard.py
 import os
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from datetime import date
-from main import Transaction, Valorisation, Base
+from main import Session, Transaction, Valorisation
 
-# Connexion à la BDD
-DATABASE_URL = os.environ.get("DATABASE_URL")
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
+st.set_page_config(page_title="Dashboard PEA", layout="wide")
+st.title("📊 Dashboard PEA - Bénéfices et valorisation")
+
+# Connexion à la base
 session = Session()
-
-st.title("📊 Dashboard PEA")
 
 # Récupérer toutes les transactions
 transactions = session.query(Transaction).all()
-df_transac = pd.DataFrame([{
+if not transactions:
+    st.warning("Aucune transaction enregistrée.")
+    st.stop()
+
+# Transformer en DataFrame
+df_tx = pd.DataFrame([{
     "isin": t.isin,
     "ticker": t.ticker,
-    "quantite": t.quantite if t.type == "achat" else -t.quantite,
+    "type": t.type,
+    "quantite": t.quantite,
     "prix_unitaire": t.prix_unitaire,
-    "frais": t.frais
+    "frais": t.frais,
+    "date": t.date
 } for t in transactions])
 
-# Prix moyen d'achat et quantité nette
-df_grouped = df_transac.groupby(["isin", "ticker"]).agg(
-    quantite_totale=("quantite", "sum"),
-    cout_total=("prix_unitaire", lambda x: (x * df_transac["quantite"]).sum())
-).reset_index()
-df_grouped = df_grouped[df_grouped["quantite_totale"] > 0]
-df_grouped["prix_moyen_achat"] = df_grouped["cout_total"] / df_grouped["quantite_totale"]
+# Séparer achats et ventes
+df_tx["quantite_signée"] = df_tx.apply(lambda row: row["quantite"] if row["type"] == "achat" else -row["quantite"], axis=1)
 
-# Dernières valorisations
-latest_valos = session.query(Valorisation).filter_by(date=date.today()).all()
+# Calculs par ISIN
+grouped = df_tx.groupby(["isin", "ticker"]).agg(
+    quantite_totale=("quantite_signée", "sum"),
+    montant_total=("prix_unitaire", lambda x: (x * df_tx.loc[x.index, "quantite_signée"]).sum())
+).reset_index()
+
+grouped = grouped[grouped["quantite_totale"] > 0]
+grouped["prix_moyen_achat"] = grouped["montant_total"] / grouped["quantite_totale"]
+
+# Récupérer les valorisations du jour
+today = date.today()
+valorisations = session.query(Valorisation).filter_by(date=today).all()
 df_valo = pd.DataFrame([{
     "isin": v.isin,
     "ticker": v.ticker,
-    "valeur_actuelle": v.prix_unitaire
-} for v in latest_valos])
+    "cours": v.prix_unitaire
+} for v in valorisations])
 
-# Fusion
-df_merge = pd.merge(df_grouped, df_valo, on=["isin", "ticker"], how="left")
-df_merge["plus_value"] = (df_merge["valeur_actuelle"] - df_merge["prix_moyen_achat"]) * df_merge["quantite_totale"]
-df_merge["performance (%)"] = ((df_merge["valeur_actuelle"] / df_merge["prix_moyen_achat"]) - 1) * 100
+# Fusion et calcul des plus-values
+df = pd.merge(grouped, df_valo, on=["isin", "ticker"], how="left")
+df["valeur_actuelle"] = df["cours"] * df["quantite_totale"]
+df["plus_value (€)"] = (df["cours"] - df["prix_moyen_achat"]) * df["quantite_totale"]
+df["performance (%)"] = ((df["cours"] / df["prix_moyen_achat"]) - 1) * 100
 
-st.subheader("🧾 Synthèse des positions")
-st.dataframe(df_merge[[
-    "isin", "ticker", "quantite_totale", "prix_moyen_achat", "valeur_actuelle", "plus_value", "performance (%)"
+# Affichage
+st.subheader("💼 Positions actuelles")
+st.dataframe(df[[
+    "isin", "ticker", "quantite_totale", "prix_moyen_achat", "cours", "valeur_actuelle", "plus_value (€)", "performance (%)"
 ]])
 
 session.close()
