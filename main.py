@@ -8,7 +8,7 @@ DATABASE_URL = "postgresql://DB_SUIFIN_owner:npg_tFPhX8frz0vi@ep-dawn-glade-ab96
 
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
-session = Session()
+#session = Session()
 
 Base = declarative_base()
 
