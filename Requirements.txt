@@ -1,5 +1,5 @@
 streamlit
 sqlalchemy
-psycopg2-binary==2.9.9
+pg8000
 pandas
 yfinance
