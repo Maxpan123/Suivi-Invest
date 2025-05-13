@@ -5,7 +5,6 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import date
 # ----- Configuration de la base -----
 DATABASE_URL = "postgresql://DB_SUIFIN_owner:npg_tFPhX8frz0vi@ep-dawn-glade-ab96c3r5-pooler.eu-west-2.aws.neon.tech/DB_SUIFIN?sslmode=require"
-DATABASE_URL = os.environ.get("DATABASE_URL").replace("postgresql://", "postgresql+pg8000://")
 
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
